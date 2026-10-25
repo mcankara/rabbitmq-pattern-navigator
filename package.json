@@ -2,7 +2,7 @@
 	"name": "rabbitmq-pattern-navigator",
 	"displayName": "RabbitMQ Pattern Navigator",
 	"description": "Ctrl+click a NestJS RabbitMQ pattern to jump between client.send/emit and its @MessagePattern/@EventPattern handler",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"publisher": "MertcanCankara",
 	"license": "MIT",
 	"icon": "icon.png",
