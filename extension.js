@@ -1,11 +1,11 @@
 const vscode = require('vscode');
 
-const { patternsInText } = require('./patterns');
+const { constantsInText, patternsInText } = require('./patterns');
 
 const SOURCES = '**/*.ts';
 const SKIPPED = '**/{node_modules,dist}/**';
 
-/** File uri → patterns found in it. */
+/** File uri → `entries`: its pattern arguments, `constants`: the pattern constants it declares. */
 const index = new Map();
 
 function positionAt(text, offset) {
@@ -24,27 +24,48 @@ async function indexFile(uri) {
 		return;
 	}
 
-	const entries = patternsInText(text).map(({ kind, pattern, start, end }) => ({
+	const entries = patternsInText(text).map(({ kind, pattern, ref, start, end }) => ({
 		kind,
 		pattern,
+		ref,
 		location: new vscode.Location(uri, new vscode.Range(positionAt(text, start), positionAt(text, end))),
 	}));
-	if (entries.length) index.set(uri.toString(), entries);
+	const constants = constantsInText(text);
+	if (entries.length || constants.length) index.set(uri.toString(), { entries, constants });
 	else index.delete(uri.toString());
 }
 
+function exportedConstants() {
+	const exported = new Map();
+	for (const { constants } of index.values()) {
+		for (const constant of constants) if (constant.exported) exported.set(constant.name, constant.pattern);
+	}
+	return exported;
+}
+
+// shortcut: imports are not followed, so a name exported from several files resolves to any one of them;
+// follow import paths if that mismatches in practice.
+/** The pattern of a literal, or of a reference to a constant in its own file or exported from any file. */
+function resolve(match, ownConstants, exported) {
+	if (!match.ref) return match.pattern;
+	return ownConstants.find(({ name }) => name === match.ref)?.pattern ?? exported.get(match.ref);
+}
+
 function patternAt(document, position) {
+	const text = document.getText();
 	const offset = document.offsetAt(position);
-	return patternsInText(document.getText()).find(({ start, end }) => offset >= start && offset <= end);
+	const match = patternsInText(text).find(({ start, end }) => offset >= start && offset <= end);
+	return match && { ...match, pattern: resolve(match, constantsInText(text), exportedConstants()) };
 }
 
 const counterpart = kind => (kind === 'sender' ? 'handler' : 'sender');
 
 function locationsOf(pattern, kind) {
+	const exported = exportedConstants();
 	const locations = [];
-	for (const entries of index.values()) {
+	for (const { entries, constants } of index.values()) {
 		for (const entry of entries) {
-			if (entry.pattern === pattern && (!kind || entry.kind === kind)) locations.push(entry.location);
+			if ((!kind || entry.kind === kind) && resolve(entry, constants, exported) === pattern) locations.push(entry.location);
 		}
 	}
 	return locations;
@@ -74,18 +95,18 @@ function activate(context) {
 		// Ctrl+click: sender → its handlers, handler → its senders.
 		vscode.languages.registerDefinitionProvider(selector, {
 			async provideDefinition(document, position) {
-				const match = patternAt(document, position);
-				if (!match) return undefined;
 				await ready;
+				const match = patternAt(document, position);
+				if (!match?.pattern) return undefined;
 				return locationsOf(match.pattern, counterpart(match.kind));
 			},
 		}),
 		// Shift+F12: every sender and handler of the pattern.
 		vscode.languages.registerReferenceProvider(selector, {
 			async provideReferences(document, position) {
-				const match = patternAt(document, position);
-				if (!match) return undefined;
 				await ready;
+				const match = patternAt(document, position);
+				if (!match?.pattern) return undefined;
 				return locationsOf(match.pattern);
 			},
 		}),
@@ -94,13 +115,17 @@ function activate(context) {
 			onDidChangeCodeLenses: changed.event,
 			async provideCodeLenses(document) {
 				await ready;
+				const text = document.getText();
+				const constants = constantsInText(text);
+				const exported = exportedConstants();
 				const lenses = [];
-				for (const { kind, pattern, start, end } of patternsInText(document.getText())) {
-					const other = counterpart(kind);
-					const locations = locationsOf(pattern, other);
+				for (const match of patternsInText(text)) {
+					const pattern = resolve(match, constants, exported);
+					const other = counterpart(match.kind);
+					const locations = pattern ? locationsOf(pattern, other) : [];
 					// No lens without a counterpart: those are mostly res.send(...) and EventEmitter calls.
 					if (!locations.length) continue;
-					const range = new vscode.Range(document.positionAt(start), document.positionAt(end));
+					const range = new vscode.Range(document.positionAt(match.start), document.positionAt(match.end));
 					lenses.push(
 						new vscode.CodeLens(range, {
 							title: `${locations.length} ${other}${locations.length === 1 ? '' : 's'}`,

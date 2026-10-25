@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
-const { patternsInText } = require('./patterns');
+const { constantsInText, patternsInText } = require('./patterns');
 
 const rangeOf = (text, pattern) => ({ start: text.indexOf(pattern), end: text.indexOf(pattern) + pattern.length });
 
@@ -50,8 +50,40 @@ test('finds patterns in calls wrapped over several lines', () => {
 	]);
 });
 
-test('ignores calls without a literal pattern', () => {
-	assert.deepEqual(patternsInText('\t\tthis.kafkaClient.emit(topic, message);'), []);
+test('finds constant references, to be resolved later', () => {
+	const sender = '\t\tthis.client.send<User>(Patterns.GetUser, { id });';
+	const handler = '\t@EventPattern(USER_CREATED)';
+
+	assert.deepEqual(patternsInText(sender), [
+		{ kind: 'sender', ref: 'Patterns.GetUser', ...rangeOf(sender, 'Patterns.GetUser') },
+	]);
+	assert.deepEqual(patternsInText(handler), [
+		{ kind: 'handler', ref: 'USER_CREATED', ...rangeOf(handler, 'USER_CREATED') },
+	]);
+});
+
+test('ignores calls without a literal or a plain reference', () => {
 	assert.deepEqual(patternsInText("\t@Post('list')"), []);
 	assert.deepEqual(patternsInText("\t\tres.send({ id: user.id, name: 'x' });"), []);
+	assert.deepEqual(patternsInText('\t\tthis.client.send(patternFor(user), payload);'), []);
+});
+
+test('finds string constants, object constants and their keys, and string enum members', () => {
+	const text = [
+		"export const USER_CREATED = 'user.created';",
+		"const SUM: Pattern = { cmd: 'sum' };",
+		"export const PATTERNS = {\n\tGET_USER: 'get-user',\n\t'DELETE_USER': \"delete-user\",\n} as const;",
+		"export const enum Events {\n\tCreated = 'order.created',\n\tCount = 3,\n}",
+		"const handler = (pattern) => this.client.send(pattern, {});",
+	].join('\n');
+
+	assert.deepEqual(constantsInText(text), [
+		{ name: 'USER_CREATED', pattern: 'user.created', exported: true },
+		{ name: 'SUM', pattern: '{"cmd":"sum"}', exported: false },
+		{ name: 'SUM.cmd', pattern: 'sum', exported: false },
+		{ name: 'PATTERNS', pattern: '{"DELETE_USER":"delete-user","GET_USER":"get-user"}', exported: true },
+		{ name: 'PATTERNS.GET_USER', pattern: 'get-user', exported: true },
+		{ name: 'PATTERNS.DELETE_USER', pattern: 'delete-user', exported: true },
+		{ name: 'Events.Created', pattern: 'order.created', exported: true },
+	]);
 });
