@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+	<!-- source for icon.png; vsce rejects SVG icons, re-render with Chrome headless after edits -->
+	<defs>
+		<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0" stop-color="#FF8A2B"/>
+			<stop offset="1" stop-color="#E8530A"/>
+		</linearGradient>
+		<marker id="head" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="30" markerHeight="30" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+			<path d="M0 0 L10 5 L0 10 Z" fill="#fff"/>
+		</marker>
+	</defs>
+	<rect width="256" height="256" rx="56" fill="url(#bg)"/>
+	<path d="M78 116 C 92 46, 164 46, 180 108" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" marker-start="url(#head)" marker-end="url(#head)"/>
+	<rect x="28" y="134" width="92" height="66" rx="10" fill="#fff"/>
+	<polyline points="38,146 74,174 110,146" fill="none" stroke="#E8530A" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+	<text x="184" y="200" text-anchor="middle" font-family="Arial Black, Helvetica Neue, sans-serif" font-size="108" font-weight="900" fill="#fff" stroke="#fff" stroke-width="5" stroke-linejoin="round">@</text>
+</svg>

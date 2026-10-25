@@ -2,9 +2,10 @@
 	"name": "rabbitmq-pattern-navigator",
 	"displayName": "RabbitMQ Pattern Navigator",
 	"description": "Ctrl+click a NestJS RabbitMQ pattern to jump between client.send/emit and its @MessagePattern/@EventPattern handler",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"publisher": "MertcanCankara",
 	"license": "MIT",
+	"icon": "icon.png",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/mcankara/rabbitmq-pattern-navigator.git"
@@ -19,7 +20,8 @@
 	"files": [
 		"extension.js",
 		"patterns.js",
-		"LICENSE"
+		"LICENSE",
+		"icon.png"
 	],
 	"scripts": {
 		"package": "npx --yes @vscode/vsce package --no-dependencies",
